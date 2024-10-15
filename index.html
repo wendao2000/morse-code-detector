@@ -1,0 +1,234 @@
+<!--
+    Morse Code Detector
+    Created with the assistance of Claude AI (Anthropic)
+    Date: 15 Oct 2024
+-->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Configurable Morse Code Detector</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            background-color: #f0f0f0;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        #output, #translation {
+            font-size: 24px;
+            margin: 20px 0;
+            padding: 10px;
+            background-color: white;
+            border-radius: 5px;
+            min-width: 300px;
+            min-height: 50px;
+            text-align: center;
+        }
+        #instructions, #config {
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        button {
+            font-size: 16px;
+            margin: 10px;
+            padding: 5px 10px;
+            cursor: pointer;
+        }
+        input[type="number"] {
+            width: 60px;
+        }
+        #morseGuide {
+            background-color: #e9ecef;
+            border: 1px solid #ced4da;
+            border-radius: 5px;
+            padding: 15px;
+            margin-bottom: 20px;
+            max-width: 600px;
+            text-align: left;
+        }
+        #morseGuide h3 {
+            margin-top: 0;
+            text-align: center;
+        }
+        #morseGuide table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        #morseGuide td {
+            padding: 5px;
+            border: 1px solid #ced4da;
+        }
+    </style>
+</head>
+<body>
+    <div id="instructions">
+        <p>Press and hold the space bar to input Morse code:</p>
+        <p>Tap for dot, Hold for dash</p>
+        <p>No input for the set duration will add a space</p>
+    </div>
+    <div id="morseGuide">
+        <h3>Morse Code Guide</h3>
+        <table>
+            <tr>
+                <td>A .-</td>
+                <td>B -...</td>
+                <td>C -.-.</td>
+                <td>D -..</td>
+                <td>E .</td>
+                <td>F ..-.</td>
+                <td>G --.</td>
+            </tr>
+            <tr>
+                <td>H ....</td>
+                <td>I ..</td>
+                <td>J .---</td>
+                <td>K -.-</td>
+                <td>L .-..</td>
+                <td>M --</td>
+                <td>N -.</td>
+            </tr>
+            <tr>
+                <td>O ---</td>
+                <td>P .--.</td>
+                <td>Q --.-</td>
+                <td>R .-.</td>
+                <td>S ...</td>
+                <td>T -</td>
+                <td>U ..-</td>
+            </tr>
+            <tr>
+                <td>V ...-</td>
+                <td>W .--</td>
+                <td>X -..-</td>
+                <td>Y -.--</td>
+                <td>Z --..</td>
+                <td>1 .----</td>
+                <td>2 ..---</td>
+            </tr>
+            <tr>
+                <td>3 ...--</td>
+                <td>4 ....-</td>
+                <td>5 .....</td>
+                <td>6 -....</td>
+                <td>7 --...</td>
+                <td>8 ---..</td>
+                <td>9 ----.</td>
+            </tr>
+            <tr>
+                <td>0 -----</td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+            </tr>
+        </table>
+    </div>
+    <div id="config">
+        <label>Dash threshold (ms): <input type="number" id="dashThreshold" value="150" min="50" step="50"></label>
+        <label>Space threshold (ms): <input type="number" id="spaceThreshold" value="300" min="100" step="50"></label>
+        <button id="applyConfig">Apply Configuration</button>
+    </div>
+    <div id="output"></div>
+    <div id="translation"></div>
+    <button id="resetButton">Reset</button>
+
+    <script>
+        const output = document.getElementById('output');
+        const translation = document.getElementById('translation');
+        const resetButton = document.getElementById('resetButton');
+        const applyConfigButton = document.getElementById('applyConfig');
+        const dashThresholdInput = document.getElementById('dashThreshold');
+        const spaceThresholdInput = document.getElementById('spaceThreshold');
+
+        let startTime;
+        let endTime;
+        let timeoutId;
+        let morse = '';
+        let dashThreshold = 150;
+        let spaceThreshold = 300;
+        let isSpacePressed = false;
+        
+        const morseToChar = {
+            '.-': 'A', '-...': 'B', '-.-.': 'C', '-..': 'D', '.': 'E',
+            '..-.': 'F', '--.': 'G', '....': 'H', '..': 'I', '.---': 'J',
+            '-.-': 'K', '.-..': 'L', '--': 'M', '-.': 'N', '---': 'O',
+            '.--.': 'P', '--.-': 'Q', '.-.': 'R', '...': 'S', '-': 'T',
+            '..-': 'U', '...-': 'V', '.--': 'W', '-..-': 'X', '-.--': 'Y',
+            '--..': 'Z', '-----': '0', '.----': '1', '..---': '2', '...--': '3',
+            '....-': '4', '.....': '5', '-....': '6', '--...': '7', '---..': '8',
+            '----.': '9'
+        };
+
+        function translateMorse(morseCode) {
+            return morseCode.split(' ').map(code => morseToChar[code] || '').join('');
+        }
+
+        function resetMorse() {
+            morse = '';
+            output.textContent = morse;
+            translation.textContent = '';
+            clearTimeout(timeoutId);
+        }
+
+        function updateOutput() {
+            output.textContent = morse;
+            translation.textContent = translateMorse(morse);
+        }
+
+        function startSpaceTimer() {
+            clearTimeout(timeoutId);
+            timeoutId = setTimeout(() => {
+                if (!isSpacePressed) {
+                    morse += ' ';
+                    updateOutput();
+                }
+            }, spaceThreshold);
+        }
+
+        document.addEventListener('keydown', (e) => {
+            if (e.code === 'Space' && !isSpacePressed) {
+                e.preventDefault();
+                isSpacePressed = true;
+                startTime = new Date().getTime();
+                clearTimeout(timeoutId);
+            }
+        });
+
+        document.addEventListener('keyup', (e) => {
+            if (e.code === 'Space') {
+                endTime = new Date().getTime();
+                const duration = endTime - startTime;
+                
+                morse += (duration < dashThreshold) ? '.' : '-';
+                updateOutput();
+                
+                startTime = null;
+                endTime = null;
+                isSpacePressed = false;
+
+                startSpaceTimer();
+            }
+        });
+
+        resetButton.addEventListener('click', resetMorse);
+
+        applyConfigButton.addEventListener('click', () => {
+            resetMorse();
+            dashThreshold = parseInt(dashThresholdInput.value);
+            spaceThreshold = parseInt(spaceThresholdInput.value);
+            alert('Configuration applied successfully and input reset!');
+        });
+    </script>
+</body>
+</html>
